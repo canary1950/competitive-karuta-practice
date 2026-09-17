@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>競技かるた 練習特化版</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;background:linear-gradient(135deg,#f7f1e5,#efe3cc);color:#2c261f}
+.container{max-width:1100px;margin:auto;padding:20px}.card{background:#fffffff2;border-radius:22px;padding:22px;box-shadow:0 10px 28px #00000014;margin-bottom:18px}
+h1{text-align:center;color:#7a1e2c;letter-spacing:.08em;margin-bottom:8px}.subtitle{text-align:center;color:#6b6157;margin-bottom:20px}
+.settings-grid,.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:16px}
+label{display:block;margin-bottom:8px;font-weight:700;color:#5c4a3b}select,button{width:100%;border-radius:14px;font-size:1rem}
+select{border:2px solid #e3d4b5;padding:12px;background:white}button{border:0;padding:14px;cursor:pointer}.primary{background:#8b2f3c;color:white}.secondary{background:#d7c29f}.ghost{background:#f3ede2}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.row button{flex:1 1 160px}
+.status{background:#fff7ea;border:1px solid #ebdcc0;border-radius:16px;padding:14px}.status small{color:#756a5e}.status b{display:block;font-size:1.35rem;color:#7a1e2c;margin-top:5px}
+.reading{background:#fffaf0;border:2px solid #ead9b8;border-radius:18px;padding:20px;margin-top:18px;min-height:150px}.reading-main{font-size:1.5rem;line-height:1.8}.sub{color:#6b6157;line-height:1.7}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}.choice{text-align:left;background:#f8f3e9;border:2px solid transparent;min-height:90px;line-height:1.6}.choice.correct{background:#dff3df;border-color:#6ea56e}.choice.wrong{background:#f8dddd;border-color:#c76a6a}
+.result{margin-top:16px;padding:16px;background:#faf5eb;border-left:6px solid #c19a4c;border-radius:14px;line-height:1.8}.hidden{display:none}.note{background:#fff7e5;border:1px dashed #d8b267;border-radius:14px;padding:14px;line-height:1.8;margin-top:16px}
+.list{display:grid;gap:12px;margin-top:16px}.poem{border:1px solid #ebdcc0;border-radius:16px;background:#fffaf2;padding:14px;line-height:1.8}.pill{display:inline-block;background:#8b2f3c;color:white;border-radius:999px;padding:4px 10px;font-size:.86rem}
+@media(max-width:640px){.container{padding:12px}.card{padding:16px}.reading-main{font-size:1.18rem}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>競技かるた 練習特化版</h1>
+<p class="subtitle">決まり字・空札・反応速度を重点的に鍛える</p>
+
+<section id="home" class="card">
+<h2>練習メニュー</h2>
+<div class="settings-grid">
+<div><label>練習モード</label><select id="mode"><option value="kimariji">決まり字反応練習</option><option value="false">空札入り練習</option><option value="weak">苦手札反復</option></select></div>
+<div><label>決まり字グループ</label><select id="group"><option value="all">すべて</option><option value="1">1字決まり</option><option value="2">2字決まり</option><option value="3">3字決まり</option><option value="4">4字決まり</option><option value="5">5字決まり</option><option value="6">6字決まり</option></select></div>
+<div><label>問題数</label><select id="count"><option>10</option><option>20</option><option>30</option><option>50</option></select></div>
+<div><label>選択肢</label><select id="cardCount"><option>4</option><option>6</option><option>8</option></select></div>
+<div><label>開始までの待ち時間</label><select id="delay"><option value="0">すぐ</option><option value="1500">1.5秒</option><option value="2500">2.5秒</option></select></div>
+</div>
+<div class="row"><button class="primary" id="start">練習を始める</button><button class="secondary" id="listBtn">札一覧</button></div>
+<div class="note"><b>練習のポイント</b><br>まず1字決まりで反応速度を高め、次に2字・3字へ広げてください。間違えた札は苦手札として記録されます。</div>
+</section>
+
+<section id="practice" class="card hidden">
+<div class="status-grid">
+<div class="status"><small>問題</small><b id="progress">0 / 0</b></div>
+<div class="status"><small>正解</small><b id="correct">0</b></div>
+<div class="status"><small>お手つき</small><b id="wrong">0</b></div>
+<div class="status"><small>平均反応</small><b id="avg">-</b></div>
+</div>
+<div class="reading"><div id="modeName" class="sub"></div><div id="reading" class="reading-main">準備中…</div><div id="hint" class="sub"></div></div>
+<div id="cards" class="cards"></div><div id="answer" class="result hidden"></div>
+<div class="row"><button id="next" class="primary hidden">次の問題へ</button><button id="homeBtn" class="ghost">ホームへ</button></div>
+</section>
+
+<section id="finish" class="card hidden"><h2>練習結果</h2><div id="score" class="reading-main"></div><div id="comment" class="note"></div><div class="row"><button id="retry" class="primary">もう一度</button><button id="finishHome" class="ghost">ホームへ</button></div></section>
+<section id="listScreen" class="card hidden"><h2>札一覧・苦手札</h2><div id="poemList" class="list"></div><div class="row"><button id="listHome" class="ghost">ホームへ</button></div></section>
+</div>
+<script>
+const base=[
+[18,"す","1","住の江の 岸による波 よるさへや","夢の通ひ路 人目よくらむ"],
+[22,"ふ","1","吹くからに 秋の草木の しをるれば","むべ山風を 嵐といふらむ"],
+[57,"め","1","めぐり逢ひて 見しやそれとも わかぬ間に","雲がくれにし 夜半の月かな"],
+[70,"さ","1","さびしさに 宿を立ち出でて ながむれば","いづこも同じ 秋の夕暮れ"],
+[77,"せ","1","瀬をはやみ 岩にせかるる 滝川の","われても末に 逢はむとぞ思ふ"],
+[81,"ほ","1","ほととぎす 鳴きつる方を ながむれば","ただ有明の 月ぞ残れる"],
+[87,"む","1","村雨の 露もまだひぬ まきの葉に","霧立ちのぼる 秋の夕暮れ"],
+[4,"たご","2","田子の浦に うち出でて見れば 白妙の","富士の高嶺に 雪は降りつつ"],
+[5,"おく","2","奥山に 紅葉踏み分け 鳴く鹿の","声聞く時ぞ 秋は悲しき"],
+[13,"つく","2","筑波嶺の 峰より落つる みなの川","恋ぞつもりて 淵となりぬる"],
+[23,"つき","2","月見れば 千々にものこそ 悲しけれ","わが身ひとつの 秋にはあらねど"],
+[40,"しの","2","忍ぶれど 色に出でにけり わが恋は","ものや思ふと 人の問ふまで"],
+[65,"うら","2","恨みわび ほさぬ袖だに あるものを","恋に朽ちなむ 名こそ惜しけれ"],
+[3,"あし","3","あしびきの 山鳥の尾の しだり尾の","ながながし夜を ひとりかも寝む"],
+[6,"かさ","3","かささぎの 渡せる橋に おく霜の","白きを見れば 夜ぞふけにける"],
+[10,"これ","3","これやこの 行くも帰るも 別れては","知るも知らぬも 逢坂の関"],
+[33,"ひさ","3","ひさかたの 光のどけき 春の日に","しづ心なく 花の散るらむ"],
+[2,"はるす","4","春すぎて 夏来にけらし 白妙の","衣ほすてふ 天の香具山"],
+[12,"あまつ","4","天つ風 雲の通ひ路 吹きとぢよ","をとめの姿 しばしとどめむ"],
+[30,"ありあ","5","有明の つれなく見えし 別れより","暁ばかり うきものはなし"],
+[1,"あきの","6","秋の田の かりほの庵の 苫をあらみ","わが衣手は 露にぬれつつ"],
+[7,"あまの","6","天の原 ふりさけ見れば 春日なる","三笠の山に 出でし月かも"],
+[8,"わがいお","6","わが庵は 都のたつみ しかぞ住む","世をうぢ山と 人はいふなり"],
+[11,"わたのはらや","6","わたの原 八十島かけて こぎ出でぬと","人には告げよ あまのつり舟"]
+];
+const poems=base.map(x=>({id:x[0],k:x[1],g:x[2],kami:x[3],shimo:x[4],mistakes:0,attempts:0}));
+let queue=[],idx=0,current=null,correctN=0,wrongN=0,times=[],startAt=0,answered=false,timer=null;
+const $=id=>document.getElementById(id), screens=["home","practice","finish","listScreen"];
+function show(id){screens.forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+function shuffle(a){a=[...a];for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function modeLabel(){return $("mode").value==="false"?"空札入り練習":$("mode").value==="weak"?"苦手札反復":"決まり字反応練習"}
+function pool(){let a=$("group").value==="all"?poems:poems.filter(p=>p.g===$("group").value);if($("mode").value==="weak"){let w=a.filter(p=>p.mistakes>0);if(w.length>=2)a=w.sort((x,y)=>y.mistakes-x.mistakes)}return a}
+function update(){ $("progress").textContent=`${Math.min(idx+1,queue.length)} / ${queue.length}`;$("correct").textContent=correctN;$("wrong").textContent=wrongN;$("avg").textContent=times.length?(times.reduce((a,b)=>a+b,0)/times.length/1000).toFixed(2)+"秒":"-" }
+function begin(){let p=pool();if(!p.length)return alert("この条件では出題できません。");queue=shuffle(p).slice(0,Math.min(+$("count").value,p.length));idx=correctN=wrongN=0;times=[];show("practice");question()}
+function question(){if(idx>=queue.length)return finish();current=queue[idx];answered=false;$("answer").classList.add("hidden");$("next").classList.add("hidden");$("cards").innerHTML="";$("modeName").textContent=modeLabel();$("reading").textContent="読み上げ準備中…";$("hint").textContent="";update();clearTimeout(timer);timer=setTimeout(()=>{$("reading").textContent=$("mode").value==="kimariji"?current.k:current.kami;$("hint").textContent=`${current.g}字決まり`;renderCards();startAt=Date.now()},+$("delay").value)}
+function renderCards(){let n=+$("cardCount").value, others=shuffle(poems.filter(p=>p.id!==current.id)).slice(0,n-1), arr=shuffle([current,...others]);$("cards").innerHTML="";arr.forEach(p=>{let b=document.createElement("button");b.className="choice";b.textContent=p.shimo;b.onclick=()=>answer(b,p);$("cards").appendChild(b)})}
+function answer(btn,p){if(answered)return;answered=true;let t=Date.now()-startAt;times.push(t);current.attempts++;[...$("cards").children].forEach(b=>{b.disabled=true;if(b.textContent===current.shimo)b.classList.add("correct")});if(p.id===current.id){correctN++;btn.classList.add("correct");$("answer").innerHTML=`✅ 正解　反応 ${(t/1000).toFixed(2)}秒<br>決まり字：<b>${current.k}</b>`}else{wrongN++;current.mistakes++;btn.classList.add("wrong");$("answer").innerHTML=`❌ お手つき　反応 ${(t/1000).toFixed(2)}秒<br>正解：${current.shimo}<br>決まり字：<b>${current.k}</b>`}$("answer").classList.remove("hidden");$("next").classList.remove("hidden");update()}
+function finish(){let av=times.length?(times.reduce((a,b)=>a+b,0)/times.length/1000).toFixed(2):"-";$("score").textContent=`${queue.length}問中 ${correctN}問正解 / お手つき ${wrongN}回`;$("comment").innerHTML=`平均反応時間：<b>${av}秒</b><br>間違えた札は「苦手札反復」で再練習できます。`;show("finish")}
+function list(){let a=[...poems].sort((x,y)=>y.mistakes-x.mistakes||x.id-y.id);$("poemList").innerHTML=a.map(p=>`<div class="poem"><span class="pill">${p.id}番 / ${p.g}字決まり</span><br><b>決まり字：</b>${p.k}<br>${p.kami}<br><b>${p.shimo}</b><br><span class="sub">練習 ${p.attempts}回 / ミス ${p.mistakes}回</span></div>`).join("");show("listScreen")}
+console.assert(poems.length>0,"practice data exists");console.assert(poems.every(p=>p.id&&p.k&&p.g&&p.kami&&p.shimo),"all records valid");console.assert(poems.filter(p=>p.g==="1").length===7,"1字決まりは7首");
+$("start").onclick=begin;$("next").onclick=()=>{idx++;question()};$("homeBtn").onclick=()=>{clearTimeout(timer);show("home")};$("finishHome").onclick=()=>show("home");$("listHome").onclick=()=>show("home");$("retry").onclick=begin;$("listBtn").onclick=list;
+</script>
+</body>
+</html>
