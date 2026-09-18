@@ -3,14 +3,14 @@
 *{box-sizing:border-box}body{margin:0;font-family:"Hiragino Sans","Yu Gothic",sans-serif;background:#f4ead8;color:#2d261f}.wrap{max-width:1050px;margin:auto;padding:16px}.panel{background:#fff;border-radius:20px;padding:20px;margin:14px 0;box-shadow:0 8px 24px #0001}h1{text-align:center;color:#7b2432}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}select,button{width:100%;padding:13px;border-radius:12px;font-size:16px}select{background:#fff;border:2px solid #ddcbaa}button{border:0;cursor:pointer}.primary{background:#852d3b;color:#fff}.secondary{background:#e6d6ba}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.row button{flex:1 1 160px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{background:#fff7e9;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;color:#852d3b;font-size:20px}.reading{background:#fffaf1;border:2px solid #ead7b5;border-radius:16px;padding:18px;margin-top:15px;font-size:24px;line-height:1.8}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}.choice{background:#f8f2e7;text-align:left;line-height:1.6;min-height:90px}.correct{background:#dcefdc!important}.wrong{background:#f5dada!important}.feedback{background:#fff8e8;border-left:6px solid #c49b4a;padding:16px;border-radius:12px;margin-top:14px;line-height:1.9}.full-yomi{font-size:22px;margin:8px 0}.kim{color:#d00000;font-weight:800}.rest{color:#111}.hidden{display:none}.livebox{font-size:30px;letter-spacing:.08em;min-height:2.2em}.live-kim{color:#d00000;font-weight:800}.live-rest{color:#111}.ready{color:#8a7964;font-size:16px}.cue{display:inline-block;margin-left:12px;padding:3px 10px;border-radius:999px;background:#d00000;color:#fff;font-size:15px;font-weight:800;animation:pop .25s ease-out}@keyframes pop{from{transform:scale(.65);opacity:.2}to{transform:scale(1);opacity:1}}.small{font-size:14px;color:#6e6256}.poem{padding:12px;border-bottom:1px solid #eadfcf;line-height:1.7}@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.reading{font-size:20px}}</style></head>
 <body><div class="wrap"><h1>競技かるた 練習特化版</h1>
 <section id="home" class="panel"><h2>100首・決まり字練習</h2><div class="grid">
-<label>練習モード<select id="mode"><option value="kim">決まり字反応練習</option><option value="live">実戦・上の句逐次表示</option><option value="full">上の句反応練習</option><option value="weak">苦手札反復</option></select></label>
+<label>練習モード<select id="mode"><option value="kim">決まり字反応練習</option><option value="live">実戦・上の句逐次表示</option><option value="real">実音声・競技練習</option><option value="full">上の句反応練習</option><option value="weak">苦手札反復</option></select></label>
 <label>決まり字<select id="group"><option value="all">1〜6字すべて</option><option value="1">1字決まり（7首）</option><option value="2">2字決まり（42首）</option><option value="3">3字決まり（37首）</option><option value="4">4字決まり（6首）</option><option value="5">5字決まり（2首）</option><option value="6">6字決まり（6首）</option></select></label>
 <label>問題数<select id="count"><option>10</option><option>20</option><option>30</option><option>50</option><option>100</option></select></label>
 <label>選択肢<select id="choices"><option>4</option><option>6</option><option>8</option></select></label>
 <label>音声<select id="speech"><option value="on">読み上げ ON</option><option value="off">読み上げ OFF</option></select></label>
 <label>読み速度<select id="rate"><option value="0.75">ゆっくり</option><option value="0.9" selected>標準</option><option value="1.05">速め</option></select></label></div>
 <div class="row"><button class="primary" id="start">練習開始</button><button class="secondary" id="listBtn">100首一覧</button></div>
-<p class="small">「実戦・上の句逐次表示」では上の句を読み上げながら文字を表示します。決まり字に達すると「今！」＋短い音で合図し、その瞬間から0.01秒単位で反応時間を測ります。回答後は決まり字を赤、残りを黒で全文確認できます。</p></section>
+<p class="small">「実音声・競技練習」では100首の実際の読みを再生し、音声開始から札を取るまでの時間を0.01秒単位で測ります。決まり字の時刻登録は不要です。回答後は決まり字を赤、残りを黒で全文確認できます。</p></section>
 <section id="practice" class="panel hidden"><div class="stats"><div class="stat">問題<b id="prog"></b></div><div class="stat">正解<b id="ok">0</b></div><div class="stat">お手つき<b id="ng">0</b></div><div class="stat">平均反応<b id="avg">-</b></div></div>
 <div class="reading" id="prompt"></div><div class="cards" id="cards"></div><div id="fb" class="feedback hidden"></div>
 <div class="row"><button id="next" class="primary hidden">次の問題</button><button id="back" class="secondary">ホーム</button></div></section>
@@ -24,13 +24,26 @@ function shuffle(a){a=[...a];for(let n=a.length-1;n>0;n--){let j=Math.floor(Math
 function pool(){let a=$("group").value==="all"?poems:poems.filter(p=>p.g===$("group").value);if($("mode").value==="weak"){let w=a.filter(p=>p.mistakes);if(w.length)a=w.sort((a,b)=>b.mistakes-a.mistakes)}return a}
 function stats(){$("prog").textContent=`${Math.min(i+1,q.length)} / ${q.length}`;$("ok").textContent=oks;$("ng").textContent=ngs;$("avg").textContent=times.length?(times.reduce((a,b)=>a+b,0)/times.length/1000).toFixed(2)+"秒":"-"}
 function start(){let p=pool();q=shuffle(p).slice(0,Math.min(+$("count").value,p.length));i=oks=ngs=0;times=[];show("practice");question()}
-function question(){if(i>=q.length)return done();cur=q[i];answered=false;$("fb").classList.add("hidden");$("next").classList.add("hidden");let live=$("mode").value==="live";$("prompt").className="reading"+(live?" livebox":"");$("prompt").textContent=live?"まもなく読み始めます…":($("mode").value==="kim"?cur.k:cur.yomi);$("cards").innerHTML="";let n=+$("choices").value, arr=shuffle([cur,...shuffle(poems.filter(p=>p.id!==cur.id)).slice(0,n-1)]);arr.forEach(p=>{let b=document.createElement("button");b.className="choice";b.textContent=p.shimo;b.disabled=live;b.onclick=()=>answer(b,p);$("cards").appendChild(b)});stats();if(live)startLive();else t0=Date.now()}
+function question(){
+ if(i>=q.length)return done();cur=q[i];answered=false;stopLive();$("fb").classList.add("hidden");$("next").classList.add("hidden");
+ let mode=$("mode").value,real=mode==="real",live=mode==="live";$("prompt").className="reading"+(live||real?" livebox":"");
+ $("prompt").textContent=real?"🎧 音声を聞いて、取れると思った瞬間に札をタップ":(live?"まもなく読み始めます…":(mode==="kim"?cur.k:cur.yomi));
+ $("cards").innerHTML="";let n=+$("choices").value,arr=shuffle([cur,...shuffle(poems.filter(p=>p.id!==cur.id)).slice(0,n-1)]);
+ arr.forEach(p=>{let x=document.createElement("button");x.className="choice";x.textContent=p.shimo;x.disabled=live;x.onclick=()=>answer(x,p);$("cards").appendChild(x)});
+ stats();if(real)startRealAudio();else if(live)startLive();else t0=nowMs();
+}
 function highlighted(p){let y=p.yomi.replaceAll(" ","");return `<span class="kim">${y.slice(0,p.k.length)}</span><span class="rest">${y.slice(p.k.length)}</span>`}
-let liveTimer=null,liveStart=0,kimTime=0,utter=null;
+let liveTimer=null,liveStart=0,kimTime=0,utter=null,realAudio=null;
 function nowMs(){return (window.performance&&performance.now)?performance.now():Date.now()}
-function stopLive(){if(liveTimer){clearTimeout(liveTimer);liveTimer=null}if("speechSynthesis" in window){speechSynthesis.cancel()}utter=null}
+function stopLive(){if(liveTimer){clearTimeout(liveTimer);liveTimer=null}if("speechSynthesis" in window)speechSynthesis.cancel();utter=null;if(realAudio){realAudio.pause();realAudio.currentTime=0;realAudio=null}}
 function beep(){try{let C=window.AudioContext||window.webkitAudioContext;if(!C)return;let c=new C(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.setValueAtTime(.07,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.08);o.start();o.stop(c.currentTime+.08);setTimeout(()=>c.close(),180)}catch(e){}}
 function speakKami(){if($("speech").value!=="on"||!("speechSynthesis" in window))return;utter=new SpeechSynthesisUtterance(cur.yomi.replaceAll(" ",""));utter.lang="ja-JP";utter.rate=+$("rate").value;utter.pitch=1;utter.volume=1;speechSynthesis.cancel();speechSynthesis.speak(utter)}
+function startRealAudio(){
+ stopLive();realAudio=new Audio(`audio/J_${cur.id}.mp3`);realAudio.preload="auto";
+ realAudio.addEventListener("playing",()=>{t0=nowMs();$("prompt").textContent="🎧 読み上げ中… 取れると思った瞬間に札をタップ";},{once:true});
+ realAudio.addEventListener("error",()=>{$("prompt").textContent=`⚠️ audio/J_${cur.id}.mp3 を読み込めませんでした`;});
+ let pr=realAudio.play();if(pr&&pr.catch)pr.catch(()=>{$("prompt").innerHTML="▶ ここをタップして音声を開始";$("prompt").style.cursor="pointer";$("prompt").onclick=()=>{realAudio.play();$("prompt").onclick=null;$("prompt").style.cursor=""}});
+}
 function startLive(){
  stopLive(); let y=cur.yomi.replaceAll(" ",""), pos=0;
  const interval=360, lead=900;
@@ -46,7 +59,7 @@ function startLive(){
    } tick();
  },lead);
 }
-function answer(btn,p){if(answered)return;stopLive();answered=true;let t=nowMs()-t0;times.push(t);cur.attempts++;[...$("cards").children].forEach(b=>{b.disabled=true;if(b.textContent===cur.shimo)b.classList.add("correct")});let good=p.id===cur.id;if(good){oks++;btn.classList.add("correct")}else{ngs++;cur.mistakes++;btn.classList.add("wrong")}$("fb").innerHTML=`<b>${good?"✅ 正解":"❌ お手つき"}</b>　反応 ${(t/1000).toFixed(2)}秒<br><div class="full-yomi">${highlighted(cur)}</div><div><b>上の句：</b>${cur.kami}</div><div><b>取り札：</b>${cur.shimo}</div><div class="small">${cur.g}字決まり「${cur.k}」</div>`;$("fb").classList.remove("hidden");$("next").classList.remove("hidden");stats()}
+function answer(btn,p){if(answered)return;stopLive();answered=true;let t=nowMs()-t0;times.push(t);cur.attempts++;[...$("cards").children].forEach(b=>{b.disabled=true;if(b.textContent===cur.shimo)b.classList.add("correct")});let good=p.id===cur.id;if(good){oks++;btn.classList.add("correct")}else{ngs++;cur.mistakes++;btn.classList.add("wrong")}let timeLabel=$("mode").value==="real"?"取るまでの時間":"反応";$("fb").innerHTML=`<b>${good?"✅ 正解":"❌ お手つき"}</b>　${timeLabel} ${(t/1000).toFixed(2)}秒<br><div class="full-yomi">${highlighted(cur)}</div><div><b>上の句：</b>${cur.kami}</div><div><b>取り札：</b>${cur.shimo}</div><div class="small">${cur.g}字決まり「${cur.k}」</div>`;$("fb").classList.remove("hidden");$("next").classList.remove("hidden");stats()}
 function done(){stopLive();let av=times.length?(times.reduce((a,b)=>a+b,0)/times.length/1000).toFixed(2):"-";$("final").innerHTML=`${q.length}問中 ${oks}問正解<br>お手つき ${ngs}回<br>平均反応 ${av}秒`;show("finish")}
 function list(){$("all").innerHTML=poems.map(p=>`<div class="poem"><b>${p.id}番　${p.g}字決まり</b><div class="full-yomi">${highlighted(p)}</div><div>${p.shimo}</div></div>`).join("");show("list")}
 console.assert(poems.length===100,"100首を収録");const expected={"1":7,"2":42,"3":37,"4":6,"5":2,"6":6};for(const g in expected)console.assert(poems.filter(p=>p.g===g).length===expected[g],`${g}字決まり件数`);console.assert(new Set(poems.map(p=>p.id)).size===100,"ID重複なし");console.assert(poems.every(p=>p.k&&p.kami&&p.yomi&&p.shimo&&p.yomi.replaceAll(" ","").startsWith(p.k)),"決まり字は読みの先頭");
