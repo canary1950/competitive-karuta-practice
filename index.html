@@ -19,14 +19,20 @@
 <section id="tournament" class="panel hidden">
 <h2>🏆 百人一首大会・読み上げ</h2>
 <div id="tSetup">
-  <p>100首からランダム・重複なしで選びます。</p>
+  <p><b>① 大会用札を選ぶ → ② 選ばれた札一覧で準備 → ③ 大会開始</b></p>
   <label>読む歌数
     <select id="tCount">
       <option>10</option><option>20</option><option>30</option><option>40</option><option>50</option>
     </select>
   </label>
-  <div class="row"><button class="primary" id="tStart">大会開始</button><button class="secondary" id="tHome">ホーム</button></div>
-  <p class="small">各MP3の中央付近にある無音区間を自動検出し、1回目は全体を再生、その後「下の句」だけをもう一度読みます。</p>
+  <div class="row"><button class="primary" id="tSelect">① 大会用札を選ぶ</button><button class="secondary" id="tHome">ホーム</button></div>
+  <div id="tSelected" class="hidden">
+    <h3>② 選ばれた札一覧</h3>
+    <p class="small">実物の札を準備しやすいよう番号順に表示しています。実際の読み上げ順は、この一覧とは別にランダム化されます。</p>
+    <div id="tSelectedList"></div>
+    <div class="row"><button class="secondary" id="tReselect">選び直す</button><button class="primary" id="tStart">③ 大会開始</button></div>
+  </div>
+  <p class="small">大会開始後は、各MP3の中央付近にある無音区間を自動検出し、1回目は全体を再生、その後「下の句」だけをもう一度読みます。</p>
 </div>
 <div id="tRun" class="hidden">
   <div class="stats"><div class="stat">進行<b id="tProg">-</b></div><div class="stat">歌番号<b id="tPoemNo">-</b></div><div class="stat">状態<b id="tState">待機</b></div><div class="stat">下の句開始<b id="tBoundary">-</b></div></div>
@@ -84,6 +90,9 @@ function done(){stopLive();let av=times.length?(times.reduce((a,b)=>a+b,0)/times
 function list(){$("all").innerHTML=poems.map(p=>`<div class="poem"><b>${p.id}番　${p.g}字決まり</b><div class="full-yomi">${highlighted(p)}</div><div>${p.shimo}</div></div>`).join("");show("list")}
 console.assert(poems.length===100,"100首を収録");console.assert([10,20,30,40,50].every(n=>n>=10&&n<=50),"大会モード歌数は10〜50首");
 console.assert(typeof detectCentralSilence==="function","大会用の中央無音検出を搭載");
+console.assert(typeof tournamentSelect==="function","大会用札の事前選択機能を搭載");
+console.assert(["10","20","30","40","50"].every(n=>[...$("tCount").options].some(o=>o.value===n)),"大会用札は10〜50首から選択可能");
+
 const expected={"1":7,"2":42,"3":37,"4":6,"5":2,"6":6};for(const g in expected)console.assert(poems.filter(p=>p.g===g).length===expected[g],`${g}字決まり件数`);console.assert(new Set(poems.map(p=>p.id)).size===100,"ID重複なし");console.assert(poems.every(p=>p.k&&p.kami&&p.yomi&&p.shimo&&p.yomi.replaceAll(" ","").startsWith(p.k)),"決まり字は読みの先頭");
 
 // ===== 大会読み上げモード（既存の練習音声処理とは独立） =====
@@ -99,11 +108,22 @@ function tournamentHome(){
   tournamentStop();$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");show("home");
 }
 function tournamentOpen(){
-  stopLive();tournamentStop();show("tournament");$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");
+  stopLive();tournamentStop();tQueue=[];show("tournament");$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");$("tSelected").classList.add("hidden");$("tSelectedList").innerHTML="";
+}
+function tournamentSelect(){
+  tournamentStop();
+  const n=+$("tCount").value;
+  const selected=shuffle(poems).slice(0,n);
+  // 準備用一覧は番号順。読み上げ順は大会開始時に別途ランダム化する。
+  tQueue=[...selected];
+  const sorted=[...selected].sort((a,b)=>a.id-b.id);
+  $("tSelectedList").innerHTML=sorted.map(p=>`<div class="poem"><b>${p.id}番</b><div>${p.kami}</div><div><b>取り札：</b>${p.shimo}</div></div>`).join("");
+  $("tSelected").classList.remove("hidden");
 }
 function tournamentStart(){
+  if(!tQueue.length){tournamentSelect();return}
   tournamentStop();
-  tQueue=shuffle(poems).slice(0,+$("tCount").value);
+  tQueue=shuffle(tQueue);
   tIndex=0;$("tSetup").classList.add("hidden");$("tRun").classList.remove("hidden");
   tournamentLoad();
 }
@@ -217,6 +237,8 @@ function tournamentPause(){
 
 $("start").onclick=start;$("next").onclick=()=>{i++;question()};$("back").onclick=()=>{stopLive();show("home")};$("retry").onclick=start;$("finishBack").onclick=()=>show("home");$("listBtn").onclick=list;$("listBack").onclick=()=>show("home");
 $("tournamentBtn").onclick=tournamentOpen;
+$("tSelect").onclick=tournamentSelect;
+$("tReselect").onclick=tournamentSelect;
 $("tStart").onclick=tournamentStart;
 $("tHome").onclick=tournamentHome;
 $("tPause").onclick=tournamentPause;
