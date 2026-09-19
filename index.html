@@ -24,15 +24,15 @@
 <label id="deadCountWrap" class="hidden">空札として読む数 <select id="deadCount">
 <option value="0">0首</option><option value="5">5首</option><option value="10">10首</option><option value="15">15首</option><option value="20">20首</option><option value="25">25首</option><option value="30">30首</option><option value="35">35首</option><option value="40">40首</option><option value="45">45首</option><option value="50">50首</option>
 </select></label>
-<div class="row"><button class="primary" id="tSelect">① 大会用札50枚を選ぶ</button><button class="secondary" id="tHome">ホーム</button></div>
-<div id="tSelected" class="hidden"><h3>② 選ばれた場札50枚</h3><p class="small">実物の札を準備しやすいよう番号順に表示します。空札は表示しません。読み上げ順は別にランダム化します。</p><div id="tSelectedList"></div><div class="row"><button class="secondary" id="tReselect">選び直す</button><button class="primary" id="tStart">③ 大会開始</button></div></div>
+<div class="row"><button type="button" class="primary" id="tSelect">① 大会用札50枚を選ぶ</button><button type="button" class="secondary" id="tHome">ホーム</button></div>
+<div id="tSelected" class="hidden"><h3>② 選ばれた場札50枚</h3><p class="small">実物の札を準備しやすいよう番号順に表示します。空札は表示しません。読み上げ順は別にランダム化します。</p><div id="tSelectedList"></div><div class="row"><button type="button" class="secondary" id="tReselect">選び直す</button><button type="button" class="primary" id="tStart">③ 大会開始</button></div></div>
 <p class="small">最初の歌は全文を1回。2首目以降は「直前の歌の下の句」→「次の歌の全文」の順で読みます。「次の歌」は手動です。</p>
 </div>
 <div id="tRun" class="hidden">
   <div class="stats"><div class="stat">進行<b id="tProg">-</b></div><div class="stat">歌番号<b id="tPoemNo">-</b></div><div class="stat">状態<b id="tState">待機</b></div><div class="stat">下の句開始<b id="tBoundary">-</b></div></div>
   <div class="reading" id="tMessage">準備中…</div>
-  <div class="row"><button class="secondary" id="tPause">一時停止</button><button class="secondary" id="tReplay">この歌を最初から</button><button class="primary" id="tNext">次の歌</button></div>
-  <div class="row"><button class="secondary" id="tEnd">大会を終了</button></div>
+  <div class="row"><button type="button" class="secondary" id="tPause">一時停止</button><button type="button" class="secondary" id="tReplay">この歌を最初から</button><button type="button" class="primary" id="tNext">次の歌</button></div>
+  <div class="row"><button type="button" class="secondary" id="tEnd">大会を終了</button></div>
 </div>
 </section>
 <section id="list" class="panel hidden"><h2>100首一覧</h2><div id="all"></div><div class="row"><button id="listBack" class="secondary">ホーム</button></div></section></div>
@@ -193,8 +193,21 @@ function playPreviousLowerThenCurrent(pd){
 }
 function tournamentNext(){
  $("tPause").textContent="一時停止";
- if(tIndex>=tQueue.length-1){tournamentStop();$("tState").textContent="終了";$("tMessage").textContent="大会の読み上げが終了しました。";return;}
- tIndex++;tournamentLoad();
+ // 古い再生・タップ待ちイベントを確実に解除
+ if($("tMessage")) $("tMessage").onclick=null;
+ tournamentStop();
+
+ if(tIndex>=tQueue.length-1){
+   $("tState").textContent="終了";
+   $("tMessage").textContent="大会の読み上げが終了しました。";
+   return;
+ }
+ tIndex++;
+ // 押した瞬間に画面を更新し、ボタンが反応したことを明示
+ tournamentSetStats("次の歌を準備中");
+ $("tMessage").textContent="前の歌の下の句を準備しています…";
+ // iPhone/Safariでもクリックイベントの後処理と競合しにくいよう次タスクで開始
+ setTimeout(()=>tournamentLoad(),0);
 }
 function tournamentRestart(){$("tPause").textContent="一時停止";tournamentLoad();}
 function tournamentPause(){
@@ -212,7 +225,10 @@ $("tReplay").onclick=tournamentRestart;
 $("tEnd").onclick=tournamentEnd;
 $("tPause").onclick=tournamentPause;
 $("tReplay").onclick=tournamentReplay;
-$("tNext").onclick=tournamentNext;
+$("tNext").onclick=function(e){
+ if(e){e.preventDefault();e.stopPropagation();}
+ tournamentNext();
+};
 $("tEnd").onclick=tournamentHome;
 
 console.assert(typeof buildTournamentQueue==="function","場札・空札キュー作成");
@@ -221,4 +237,5 @@ console.assert(typeof playPreviousLowerThenCurrent==="function","前歌下の句
 
 console.assert(typeof tournamentNext==="function","次の歌機能");
 console.assert($("tNext") && typeof $("tNext").onclick==="function","次の歌ボタン配線");
+console.assert($("tNext") && typeof $("tNext").onclick==="function","次の歌ボタンは直接イベント接続済み");
 </script></body></html>
