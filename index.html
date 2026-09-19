@@ -215,6 +215,13 @@ function tournamentPause(){
  if(a.paused){playAudio(a);$("tPause").textContent="一時停止";}else{a.pause();$("tPause").textContent="再開";}
 }
 function tournamentEnd(){tournamentStop();$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");}
+$("start").onclick=start;
+$("next").onclick=()=>{i++;question()};
+$("back").onclick=()=>{stopLive();show("home")};
+$("retry").onclick=start;
+$("finishBack").onclick=()=>show("home");
+$("listBtn").onclick=list;
+$("listBack").onclick=()=>show("home");
 $("tournamentBtn").onclick=tournamentOpen;
 $("tMode").onchange=updateDeadCountUI;
 $("tSelect").onclick=tournamentSelect;
@@ -222,9 +229,7 @@ $("tReselect").onclick=tournamentSelect;
 $("tStart").onclick=tournamentStart;
 $("tHome").onclick=tournamentHome;
 $("tReplay").onclick=tournamentRestart;
-$("tEnd").onclick=tournamentEnd;
 $("tPause").onclick=tournamentPause;
-$("tReplay").onclick=tournamentReplay;
 $("tNext").onclick=function(e){
  if(e){e.preventDefault();e.stopPropagation();}
  tournamentNext();
