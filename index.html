@@ -19,20 +19,14 @@
 <section id="tournament" class="panel hidden">
 <h2>🏆 百人一首大会・読み上げ</h2>
 <div id="tSetup">
-  <p><b>① 大会用札を選ぶ → ② 選ばれた札一覧で準備 → ③ 大会開始</b></p>
-  <label>読む歌数
-    <select id="tCount">
-      <option>10</option><option>20</option><option>30</option><option>40</option><option>50</option>
-    </select>
-  </label>
-  <div class="row"><button class="primary" id="tSelect">① 大会用札を選ぶ</button><button class="secondary" id="tHome">ホーム</button></div>
-  <div id="tSelected" class="hidden">
-    <h3>② 選ばれた札一覧</h3>
-    <p class="small">実物の札を準備しやすいよう番号順に表示しています。実際の読み上げ順は、この一覧とは別にランダム化されます。</p>
-    <div id="tSelectedList"></div>
-    <div class="row"><button class="secondary" id="tReselect">選び直す</button><button class="primary" id="tStart">③ 大会開始</button></div>
-  </div>
-  <p class="small">大会開始後は、各MP3の中央付近にある無音区間を自動検出し、1回目は全体を再生、その後「下の句」だけをもう一度読みます。</p>
+<p><b>① 大会用札50枚を選ぶ → ② 選ばれた札一覧で準備 → ③ 大会開始</b></p>
+<label>大会モード <select id="tMode"><option value="field">場札50首だけ読む</option><option value="dead">空札あり・大会モード</option></select></label>
+<label id="deadCountWrap" class="hidden">空札として読む数 <select id="deadCount">
+<option value="0">0首</option><option value="5">5首</option><option value="10">10首</option><option value="15">15首</option><option value="20">20首</option><option value="25">25首</option><option value="30">30首</option><option value="35">35首</option><option value="40">40首</option><option value="45">45首</option><option value="50">50首</option>
+</select></label>
+<div class="row"><button class="primary" id="tSelect">① 大会用札50枚を選ぶ</button><button class="secondary" id="tHome">ホーム</button></div>
+<div id="tSelected" class="hidden"><h3>② 選ばれた場札50枚</h3><p class="small">実物の札を準備しやすいよう番号順に表示します。空札は表示しません。読み上げ順は別にランダム化します。</p><div id="tSelectedList"></div><div class="row"><button class="secondary" id="tReselect">選び直す</button><button class="primary" id="tStart">③ 大会開始</button></div></div>
+<p class="small">最初の歌は全文を1回。2首目以降は「直前の歌の下の句」→「次の歌の全文」の順で読みます。「次の歌」は手動です。</p>
 </div>
 <div id="tRun" class="hidden">
   <div class="stats"><div class="stat">進行<b id="tProg">-</b></div><div class="stat">歌番号<b id="tPoemNo">-</b></div><div class="stat">状態<b id="tState">待機</b></div><div class="stat">下の句開始<b id="tBoundary">-</b></div></div>
@@ -91,12 +85,10 @@ function list(){$("all").innerHTML=poems.map(p=>`<div class="poem"><b>${p.id}番
 console.assert(poems.length===100,"100首を収録");console.assert([10,20,30,40,50].every(n=>n>=10&&n<=50),"大会モード歌数は10〜50首");
 console.assert(typeof detectCentralSilence==="function","大会用の中央無音検出を搭載");
 console.assert(typeof tournamentSelect==="function","大会用札の事前選択機能を搭載");
-console.assert(["10","20","30","40","50"].every(n=>[...$("tCount").options].some(o=>o.value===n)),"大会用札は10〜50首から選択可能");
-
 const expected={"1":7,"2":42,"3":37,"4":6,"5":2,"6":6};for(const g in expected)console.assert(poems.filter(p=>p.g===g).length===expected[g],`${g}字決まり件数`);console.assert(new Set(poems.map(p=>p.id)).size===100,"ID重複なし");console.assert(poems.every(p=>p.k&&p.kami&&p.yomi&&p.shimo&&p.yomi.replaceAll(" ","").startsWith(p.k)),"決まり字は読みの先頭");
 
 // ===== 大会読み上げモード（既存の練習音声処理とは独立） =====
-let tQueue=[],tIndex=0,tAudio=null,tObjectURL=null,tBoundarySec=null,tPhase="idle",tPaused=false,tSession=0;
+let tQueue=[],tField=[],tDeadPool=[],tIndex=0,tAudio=null,tPrevAudio=null,tObjectUrl=null,tPrevObjectUrl=null,tBoundarySec=null,tPaused=false;
 
 function tournamentStop(){
   tSession++;
@@ -108,65 +100,33 @@ function tournamentHome(){
   tournamentStop();$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");show("home");
 }
 function tournamentOpen(){
-  stopLive();tournamentStop();tQueue=[];show("tournament");$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");$("tSelected").classList.add("hidden");$("tSelectedList").innerHTML="";
+ stopLive();tournamentStop();tQueue=[];tField=[];tDeadPool=[];tIndex=0;show("tournament");
+ $("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");$("tSelected").classList.add("hidden");$("tSelectedList").innerHTML="";updateDeadCountUI();
 }
+function updateDeadCountUI(){$("deadCountWrap").classList.toggle("hidden",$("tMode").value!=="dead");}
 function tournamentSelect(){
-  tournamentStop();
-  const n=+$("tCount").value;
-  const selected=shuffle(poems).slice(0,n);
-  // 準備用一覧は番号順。読み上げ順は大会開始時に別途ランダム化する。
-  tQueue=[...selected];
-  const sorted=[...selected].sort((a,b)=>a.id-b.id);
-  $("tSelectedList").innerHTML=sorted.map(p=>`<div class="poem"><b>${p.id}番</b><div>${p.kami}</div><div><b>取り札：</b>${p.shimo}</div></div>`).join("");
-  $("tSelected").classList.remove("hidden");
+ tournamentStop();const s=shuffle(poems);tField=s.slice(0,50);const ids=new Set(tField.map(p=>p.id));tDeadPool=poems.filter(p=>!ids.has(p.id));tQueue=[];
+ const sorted=[...tField].sort((a,b)=>a.id-b.id);
+ $("tSelectedList").innerHTML=sorted.map(p=>`<div class="poem"><b>${p.id}番</b><div>${p.kami}</div><div><b>取り札：</b>${p.shimo}</div></div>`).join("");
+ $("tSelected").classList.remove("hidden");
+}
+function buildTournamentQueue(){
+ let q=tField.map(p=>({...p,isDead:false}));
+ if($("tMode").value==="dead"){const n=Math.min(50,+$("deadCount").value||0);q=q.concat(shuffle(tDeadPool).slice(0,n).map(p=>({...p,isDead:true})));}
+ return shuffle(q);
 }
 function tournamentStart(){
-  if(!tQueue.length){tournamentSelect();return}
-  tournamentStop();
-  tQueue=shuffle(tQueue);
-  tIndex=0;$("tSetup").classList.add("hidden");$("tRun").classList.remove("hidden");
-  tournamentLoad();
+ if(tField.length!==50){tournamentSelect();return} tournamentStop();tQueue=buildTournamentQueue();tIndex=0;
+ $("tSetup").classList.add("hidden");$("tRun").classList.remove("hidden");tournamentLoad();
 }
-function tSetState(s){$("tState").textContent=s}
-function tournamentLoad(){
-  if(tIndex>=tQueue.length){
-    tournamentStop();$("tProg").textContent=`${tQueue.length} / ${tQueue.length}`;
-    $("tPoemNo").textContent="-";$("tBoundary").textContent="-";tSetState("終了");
-    $("tMessage").innerHTML=`🎉 ${tQueue.length}首すべて読み終わりました。`;
-    return;
-  }
-  const p=tQueue[tIndex], session=++tSession;
-  if(tAudio){tAudio.pause();tAudio=null}
-  if(tObjectURL){URL.revokeObjectURL(tObjectURL);tObjectURL=null}
-  $("tProg").textContent=`${tIndex+1} / ${tQueue.length}`;$("tPoemNo").textContent=`${p.id}番`;
-  $("tBoundary").textContent="解析中";tSetState("準備中");
-  $("tMessage").textContent="音声を準備しています…";
-  prepareTournamentAudio(p,session);
+function tournamentHome(){tournamentStop();show("home");}
+function tournamentStop(){
+ for(const x of [tAudio,tPrevAudio])if(x){x.pause();x.src="";} tAudio=tPrevAudio=null;
+ for(const u of [tObjectUrl,tPrevObjectUrl])if(u)URL.revokeObjectURL(u);tObjectUrl=tPrevObjectUrl=null;tPaused=false;
 }
-async function prepareTournamentAudio(p,session){
-  try{
-    const res=await fetch(`audio/J_${p.id}.mp3`);
-    if(!res.ok)throw new Error("audio fetch");
-    const buf=await res.arrayBuffer();
-    if(session!==tSession)return;
-    tBoundarySec=await detectCentralSilence(buf);
-    if(session!==tSession)return;
-    const blob=new Blob([buf],{type:"audio/mpeg"});tObjectURL=URL.createObjectURL(blob);
-    tAudio=new Audio(tObjectURL);tAudio.preload="auto";
-    $("tBoundary").textContent=tBoundarySec!=null?tBoundarySec.toFixed(2)+"秒":"検出なし";
-    tPhase="full";tPaused=false;tSetState("1回目");
-    $("tMessage").textContent=`${tIndex+1}首目を読み上げています`;
-    tAudio.onended=()=>tournamentFirstEnded(session);
-    try{await tAudio.play()}catch(e){
-      $("tMessage").innerHTML="▶ ここをタップして読み上げ開始";
-      $("tMessage").style.cursor="pointer";
-      $("tMessage").onclick=async()=>{ $("tMessage").onclick=null;$("tMessage").style.cursor="";await tAudio.play(); };
-    }
-  }catch(e){
-    if(session!==tSession)return;
-    $("tBoundary").textContent="エラー";tSetState("音声エラー");
-    $("tMessage").textContent=`⚠️ J_${p.id}.mp3 を準備できませんでした。「次の歌」で進めます。`;
-  }
+function tournamentSetStats(state="準備中"){
+ const p=tQueue[tIndex];$("tProg").textContent=tQueue.length?`${Math.min(tIndex+1,tQueue.length)} / ${tQueue.length}`:"—";
+ $("tNo").textContent=p?`${p.id}番${p.isDead?"（空札）":""}`:"—";$("tState").textContent=state;
 }
 async function detectCentralSilence(arrayBuffer){
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
@@ -182,61 +142,48 @@ async function detectCentralSilence(arrayBuffer){
       for(let c=0;c<decoded.numberOfChannels;c++){
         const d=decoded.getChannelData(c),to=Math.min(pos+win,len);
         for(let j=pos;j<to;j++){let v=d[j];sum+=v*v;n++}
-      }
-      let r=Math.sqrt(sum/Math.max(1,n));rms.push({pos,r});if(r>maxR)maxR=r;
-    }
-    const threshold=Math.max(0.002,maxR*0.08);
-    let runs=[],run=null;
-    for(const x of rms){
-      if(x.r<threshold){if(!run)run={s:x.pos,e:x.pos+win};else run.e=x.pos+win}
-      else if(run){runs.push(run);run=null}
-    }
-    if(run)runs.push(run);
-    runs=runs.filter(r=>(r.e-r.s)/sr>=0.45);
-    if(!runs.length)return null;
-    const mid=len/2;
-    runs.sort((a,b)=>Math.abs(((a.s+a.e)/2)-mid)-Math.abs(((b.s+b.e)/2)-mid));
-    const best=runs[0];
-    // 下の句開始＝中央無音区間の終了
-    return Math.min(dur, best.e/sr);
-  }finally{try{await ctx.close()}catch(e){}}
+      
+async function loadTournamentAudio(p){
+ const r=await fetch(`audio/J_${p.id}.mp3`);if(!r.ok)throw new Error(`J_${p.id}.mp3 を読み込めません`);
+ const buf=await r.arrayBuffer(),AC=window.AudioContext||window.webkitAudioContext,ctx=new AC(),decoded=await ctx.decodeAudioData(buf.slice(0));
+ const boundary=detectCentralSilence(decoded);try{await ctx.close()}catch(e){}
+ return {url:URL.createObjectURL(new Blob([buf],{type:"audio/mpeg"})),boundary};
 }
-function tournamentFirstEnded(session){
-  if(session!==tSession)return;
-  if(tBoundarySec==null){
-    tSetState("下の句位置不明");
-    $("tMessage").textContent="中央の無音を検出できませんでした。次の歌へ進んでください。";
-    return;
-  }
-  tPhase="lower";tSetState("下の句・2回目");
-  $("tMessage").textContent="下の句をもう一度読み上げています";
-  tAudio.currentTime=Math.max(0,tBoundarySec);
-  tAudio.onended=()=>{
-    if(session!==tSession)return;
-    tPhase="done";tSetState("完了");
-    $("tMessage").textContent="この歌の読み上げが終わりました。「次の歌」を押してください。";
-  };
-  tAudio.play().catch(()=>{});
+function playAudio(a,onBlocked){const p=a.play();if(p&&p.catch)p.catch(onBlocked||(()=>{}));}
+async function tournamentLoad(){
+ tournamentStop();const cur=tQueue[tIndex];if(!cur)return;
+ try{
+  tournamentSetStats("準備中");const cd=await loadTournamentAudio(cur);tObjectUrl=cd.url;tBoundarySec=cd.boundary;
+  $("tBoundary").textContent=Number.isFinite(cd.boundary)?cd.boundary.toFixed(2)+"秒":"検出不可";
+  if(tIndex===0) playCurrentFull();
+  else {const pd=await loadTournamentAudio(tQueue[tIndex-1]);tPrevObjectUrl=pd.url;playPreviousLowerThenCurrent(pd);}
+ }catch(e){tournamentSetStats("エラー");$("tMsg").textContent="⚠️ "+e.message;}
+}
+function playCurrentFull(){
+ tAudio=new Audio(tObjectUrl);tAudio.preload="auto";tAudio.onplaying=()=>tournamentSetStats(tQueue[tIndex].isDead?"空札を読み上げ中":"読み上げ中");
+ tAudio.onended=()=>{tournamentSetStats("完了");$("tMsg").textContent='読み上げ終了。「次の歌」を押してください。';};
+ playAudio(tAudio,()=>{$("tMsg").textContent="▶ ここをタップして読み上げ開始";$("tMsg").onclick=()=>{$("tMsg").onclick=null;playAudio(tAudio);};});
+}
+function playPreviousLowerThenCurrent(pd){
+ if(!Number.isFinite(pd.boundary)){$("tMsg").textContent="前歌の下の句位置を検出できないため次歌を読みます。";playCurrentFull();return;}
+ tPrevAudio=new Audio(pd.url);tPrevAudio.preload="auto";tPrevAudio.onloadedmetadata=()=>{
+  tPrevAudio.currentTime=Math.max(0,pd.boundary);tournamentSetStats("前の歌の下の句");
+  tPrevAudio.onended=()=>{$("tMsg").textContent="続けて次の歌を読みます。";playCurrentFull();};
+  playAudio(tPrevAudio,()=>{$("tMsg").textContent="▶ ここをタップして前歌の下の句から開始";$("tMsg").onclick=()=>{$("tMsg").onclick=null;playAudio(tPrevAudio);};});
+ };tPrevAudio.load();
 }
 function tournamentNext(){
-  if(!tQueue.length)return;
-  tIndex++;tournamentLoad();
+ if(tIndex>=tQueue.length-1){tournamentStop();$("tState").textContent="終了";$("tMsg").textContent="大会の読み上げが終了しました。";return;}
+ tIndex++;tournamentLoad();
 }
-function tournamentReplay(){
-  if(!tQueue.length||tIndex>=tQueue.length)return;
-  tournamentLoad();
-}
+function tournamentRestart(){tournamentLoad();}
 function tournamentPause(){
-  if(!tAudio)return;
-  if(tAudio.paused){
-    tAudio.play().then(()=>{tPaused=false;$("tPause").textContent="一時停止"}).catch(()=>{});
-  }else{
-    tAudio.pause();tPaused=true;$("tPause").textContent="再開";
-  }
+ const a=(tPrevAudio&&!tPrevAudio.paused)?tPrevAudio:tAudio;if(!a)return;
+ if(a.paused){playAudio(a);$("tPause").textContent="一時停止";}else{a.pause();$("tPause").textContent="再開";}
 }
-
-$("start").onclick=start;$("next").onclick=()=>{i++;question()};$("back").onclick=()=>{stopLive();show("home")};$("retry").onclick=start;$("finishBack").onclick=()=>show("home");$("listBtn").onclick=list;$("listBack").onclick=()=>show("home");
+function tournamentEnd(){tournamentStop();$("tRun").classList.add("hidden");$("tSetup").classList.remove("hidden");}
 $("tournamentBtn").onclick=tournamentOpen;
+$("tMode").onchange=updateDeadCountUI;
 $("tSelect").onclick=tournamentSelect;
 $("tReselect").onclick=tournamentSelect;
 $("tStart").onclick=tournamentStart;
@@ -245,4 +192,8 @@ $("tPause").onclick=tournamentPause;
 $("tReplay").onclick=tournamentReplay;
 $("tNext").onclick=tournamentNext;
 $("tEnd").onclick=tournamentHome;
+
+console.assert(typeof buildTournamentQueue==="function","場札・空札キュー作成");
+console.assert([...$("deadCount").options].some(o=>o.value==="50"),"空札最大50首");
+console.assert(typeof playPreviousLowerThenCurrent==="function","前歌下の句→次歌全文");
 </script></body></html>
