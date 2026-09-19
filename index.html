@@ -126,7 +126,7 @@ function tournamentStop(){
 }
 function tournamentSetStats(state="準備中"){
  const p=tQueue[tIndex];$("tProg").textContent=tQueue.length?`${Math.min(tIndex+1,tQueue.length)} / ${tQueue.length}`:"—";
- $("tNo").textContent=p?`${p.id}番${p.isDead?"（空札）":""}`:"—";$("tState").textContent=state;
+ $("tPoemNo").textContent=p?`${p.id}番${p.isDead?"（空札）":""}`:"—";$("tState").textContent=state;
 }
 async function detectCentralSilence(arrayBuffer){
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;
@@ -142,11 +142,30 @@ async function detectCentralSilence(arrayBuffer){
       for(let c=0;c<decoded.numberOfChannels;c++){
         const d=decoded.getChannelData(c),to=Math.min(pos+win,len);
         for(let j=pos;j<to;j++){let v=d[j];sum+=v*v;n++}
-      
+      }
+      let r=Math.sqrt(sum/Math.max(1,n));rms.push({pos,r});if(r>maxR)maxR=r;
+    }
+    const threshold=Math.max(0.002,maxR*0.08);
+    let runs=[],run=null;
+    for(const x of rms){
+      if(x.r<threshold){if(!run)run={s:x.pos,e:x.pos+win};else run.e=x.pos+win}
+      else if(run){runs.push(run);run=null}
+    }
+    if(run)runs.push(run);
+    runs=runs.filter(r=>(r.e-r.s)/sr>=0.45);
+    if(!runs.length)return null;
+    const mid=len/2;
+    runs.sort((a,b)=>Math.abs(((a.s+a.e)/2)-mid)-Math.abs(((b.s+b.e)/2)-mid));
+    const best=runs[0];
+    // 下の句開始＝中央無音区間の終了
+    return Math.min(dur, best.e/sr);
+  }finally{try{await ctx.close()}catch(e){}}
+}
 async function loadTournamentAudio(p){
- const r=await fetch(`audio/J_${p.id}.mp3`);if(!r.ok)throw new Error(`J_${p.id}.mp3 を読み込めません`);
- const buf=await r.arrayBuffer(),AC=window.AudioContext||window.webkitAudioContext,ctx=new AC(),decoded=await ctx.decodeAudioData(buf.slice(0));
- const boundary=detectCentralSilence(decoded);try{await ctx.close()}catch(e){}
+ const r=await fetch(`audio/J_${p.id}.mp3`);
+ if(!r.ok)throw new Error(`J_${p.id}.mp3 を読み込めません`);
+ const buf=await r.arrayBuffer();
+ const boundary=await detectCentralSilence(buf);
  return {url:URL.createObjectURL(new Blob([buf],{type:"audio/mpeg"})),boundary};
 }
 function playAudio(a,onBlocked){const p=a.play();if(p&&p.catch)p.catch(onBlocked||(()=>{}));}
@@ -157,23 +176,23 @@ async function tournamentLoad(){
   $("tBoundary").textContent=Number.isFinite(cd.boundary)?cd.boundary.toFixed(2)+"秒":"検出不可";
   if(tIndex===0) playCurrentFull();
   else {const pd=await loadTournamentAudio(tQueue[tIndex-1]);tPrevObjectUrl=pd.url;playPreviousLowerThenCurrent(pd);}
- }catch(e){tournamentSetStats("エラー");$("tMsg").textContent="⚠️ "+e.message;}
+ }catch(e){tournamentSetStats("エラー");$("tMessage").textContent="⚠️ "+e.message;}
 }
 function playCurrentFull(){
  tAudio=new Audio(tObjectUrl);tAudio.preload="auto";tAudio.onplaying=()=>tournamentSetStats(tQueue[tIndex].isDead?"空札を読み上げ中":"読み上げ中");
- tAudio.onended=()=>{tournamentSetStats("完了");$("tMsg").textContent='読み上げ終了。「次の歌」を押してください。';};
- playAudio(tAudio,()=>{$("tMsg").textContent="▶ ここをタップして読み上げ開始";$("tMsg").onclick=()=>{$("tMsg").onclick=null;playAudio(tAudio);};});
+ tAudio.onended=()=>{tournamentSetStats("完了");$("tMessage").textContent='読み上げ終了。「次の歌」を押してください。';};
+ playAudio(tAudio,()=>{$("tMessage").textContent="▶ ここをタップして読み上げ開始";$("tMessage").onclick=()=>{$("tMessage").onclick=null;playAudio(tAudio);};});
 }
 function playPreviousLowerThenCurrent(pd){
- if(!Number.isFinite(pd.boundary)){$("tMsg").textContent="前歌の下の句位置を検出できないため次歌を読みます。";playCurrentFull();return;}
+ if(!Number.isFinite(pd.boundary)){$("tMessage").textContent="前歌の下の句位置を検出できないため次歌を読みます。";playCurrentFull();return;}
  tPrevAudio=new Audio(pd.url);tPrevAudio.preload="auto";tPrevAudio.onloadedmetadata=()=>{
   tPrevAudio.currentTime=Math.max(0,pd.boundary);tournamentSetStats("前の歌の下の句");
-  tPrevAudio.onended=()=>{$("tMsg").textContent="続けて次の歌を読みます。";playCurrentFull();};
-  playAudio(tPrevAudio,()=>{$("tMsg").textContent="▶ ここをタップして前歌の下の句から開始";$("tMsg").onclick=()=>{$("tMsg").onclick=null;playAudio(tPrevAudio);};});
+  tPrevAudio.onended=()=>{$("tMessage").textContent="続けて次の歌を読みます。";playCurrentFull();};
+  playAudio(tPrevAudio,()=>{$("tMessage").textContent="▶ ここをタップして前歌の下の句から開始";$("tMessage").onclick=()=>{$("tMessage").onclick=null;playAudio(tPrevAudio);};});
  };tPrevAudio.load();
 }
 function tournamentNext(){
- if(tIndex>=tQueue.length-1){tournamentStop();$("tState").textContent="終了";$("tMsg").textContent="大会の読み上げが終了しました。";return;}
+ if(tIndex>=tQueue.length-1){tournamentStop();$("tState").textContent="終了";$("tMessage").textContent="大会の読み上げが終了しました。";return;}
  tIndex++;tournamentLoad();
 }
 function tournamentRestart(){tournamentLoad();}
